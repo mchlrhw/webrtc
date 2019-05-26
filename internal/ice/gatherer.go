@@ -11,13 +11,13 @@ import (
 	"github.com/pion/logging"
 )
 
-// ICEGatherer gathers local host, server reflexive and relay
+// Gatherer gathers local host, server reflexive and relay
 // candidates, as well as enabling the retrieval of local Interactive
 // Connectivity Establishment (ICE) parameters which can be
 // exchanged in signaling.
-type ICEGatherer struct {
+type Gatherer struct {
 	lock  sync.RWMutex
-	state ICEGathererState
+	state GathererState
 
 	validatedServers []*ice.URL
 
@@ -32,16 +32,16 @@ type ICEGatherer struct {
 	networkTypes      []NetworkType
 }
 
-// NewICEGatherer creates a new NewICEGatherer.
-func NewICEGatherer(
+// NewGatherer creates a new NewGatherer.
+func NewGatherer(
 	portMin uint16,
 	portMax uint16,
 	connectionTimeout *time.Duration,
 	keepaliveInterval *time.Duration,
 	loggerFactory logging.LoggerFactory,
 	networkTypes []NetworkType,
-	opts ICEGatherOptions,
-) (*ICEGatherer, error) {
+	opts GatherOptions,
+) (*Gatherer, error) {
 	var validatedServers []*ice.URL
 	if len(opts.ICEServers) > 0 {
 		for _, server := range opts.ICEServers {
@@ -54,12 +54,12 @@ func NewICEGatherer(
 	}
 
 	candidateTypes := []ice.CandidateType{}
-	if opts.ICEGatherPolicy == ICETransportPolicyRelay {
+	if opts.ICEGatherPolicy == TransportPolicyRelay {
 		candidateTypes = append(candidateTypes, ice.CandidateTypeRelay)
 	}
 
-	return &ICEGatherer{
-		state:             ICEGathererStateNew,
+	return &Gatherer{
+		state:             GathererStateNew,
 		validatedServers:  validatedServers,
 		portMin:           portMin,
 		portMax:           portMax,
@@ -72,14 +72,14 @@ func NewICEGatherer(
 }
 
 // State indicates the current state of the ICE gatherer.
-func (g *ICEGatherer) State() ICEGathererState {
+func (g *Gatherer) State() GathererState {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 	return g.state
 }
 
 // Gather ICE candidates.
-func (g *ICEGatherer) Gather() error {
+func (g *Gatherer) Gather() error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -108,13 +108,13 @@ func (g *ICEGatherer) Gather() error {
 	}
 
 	g.agent = agent
-	g.state = ICEGathererStateComplete
+	g.state = GathererStateComplete
 
 	return nil
 }
 
 // Close prunes all local candidates, and closes the ports.
-func (g *ICEGatherer) Close() error {
+func (g *Gatherer) Close() error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -131,25 +131,25 @@ func (g *ICEGatherer) Close() error {
 	return nil
 }
 
-// GetLocalParameters returns the ICE parameters of the ICEGatherer.
-func (g *ICEGatherer) GetLocalParameters() (ICEParameters, error) {
+// GetLocalParameters returns the ICE parameters of the Gatherer.
+func (g *Gatherer) GetLocalParameters() (Parameters, error) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 	if g.agent == nil {
-		return ICEParameters{}, errors.New("gatherer not started")
+		return Parameters{}, errors.New("gatherer not started")
 	}
 
 	frag, pwd := g.agent.GetLocalUserCredentials()
 
-	return ICEParameters{
+	return Parameters{
 		UsernameFragment: frag,
 		Password:         pwd,
 		ICELite:          false,
 	}, nil
 }
 
-// GetLocalCandidates returns the sequence of valid local candidates associated with the ICEGatherer.
-func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
+// GetLocalCandidates returns the sequence of valid local candidates associated with the Gatherer.
+func (g *Gatherer) GetLocalCandidates() ([]Candidate, error) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
@@ -157,10 +157,10 @@ func (g *ICEGatherer) GetLocalCandidates() ([]ICECandidate, error) {
 		return nil, errors.New("gatherer not started")
 	}
 
-	iceCandidates, err := g.agent.GetLocalCandidates()
+	candidates, err := g.agent.GetLocalCandidates()
 	if err != nil {
 		return nil, err
 	}
 
-	return newICECandidatesFromICE(iceCandidates)
+	return newCandidatesFromICE(candidates)
 }
